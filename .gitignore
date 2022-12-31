@@ -1,0 +1,7 @@
+.vscode
+
+include/
+SDL2.dll
+
+build.bat
+main.exe
