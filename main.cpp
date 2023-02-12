@@ -40,6 +40,15 @@ int main()
     cout << "IND " << ind << endl;
     obj->AddComponent( collider );
 
+    Force2D::GameObject* obj2 = scene->CreateGameObject({.x=30, .y=30}, {.x=100, .y=100});
+    Force2D::BoxCollider* collider2 = new Force2D::BoxCollider( (Force2D::Vector2){.x=0, .y=0}, (Force2D::Vector2){.x=50, .y=50} );
+    int ind2 = collider2->AddOnMouseOverHandler([]() {
+        cout << "TEST mouseover 2 " << endl;
+    });
+    cout << "IND2 " << ind2 << endl;
+    obj2->AddComponent( collider2 );
+
+
     Force2D::debug = true;
     scene->StartRender(renderer);
 

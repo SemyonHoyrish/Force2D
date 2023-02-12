@@ -6,6 +6,7 @@
 
 #include <functional> //std::function
 #include <string> //std::to_string
+// #include <iostream> 
 
 
 namespace Force2D
@@ -55,14 +56,29 @@ void LogFatal(std::string message, std::string subinfo)
 }
 
 
+struct Time
+{
+    Uint64 previous  = 0;
+    Uint64 now       = 0;
+    double deltaTime = 0;
+
+    void next(Uint64 next, Uint64 frequency)
+    {
+        previous = now;
+        now = next;
+        deltaTime = (double)((now - previous)*1000 / (double)frequency);
+    }
+};
+
 class Component
 {
 public:
     std::string name;
     Vector2 relativePosition;
-    Vector2 parentPosition;
+    // Vector2 parentPosition;
     Vector2 position;
     Vector2 size;
+    int parentLayer;
     // const ComponentType type = ComponentType::BOX_COLLIDER;
 
     Component(Vector2 _relativePosition, Vector2 _size)
@@ -77,33 +93,40 @@ public:
         name     = _name;
     }
 
-    void SetParentPosition(Vector2 _parentPosition)
+    void SetParentData(Vector2 _parentPosition, int _parentLayer)
     {
         parentPosition = _parentPosition;
-        position = parentPosition + relativePosition;
+        parentLayer    = _parentLayer;
+        position       = parentPosition + relativePosition;
     }
 
-    virtual void Update()
+    virtual void Update(Time time)
     {
         LogError("Update call in Component");
     }
+
+private:
+    Vector2 parentPosition;
 
 };
 
 class BoxCollider : public Component
 {
 
-private:
-    std::vector<std::function<void()>> onMouseOverHandlers;
-
+// private:
 public:
+    std::vector<std::pair<std::function<void()>, bool>> onMouseOverHandlers;
+    static double onMouseOverHandlersPoolTime;
+    static std::vector<std::pair<std::function<void()>, int>> onMouseOverHandlersPool;
+
+// public:
 
     BoxCollider(Vector2 _position, Vector2 _size) : Component(_position, _size) {}
     BoxCollider(Vector2 _position, Vector2 _size, std::string _name) : Component(_position, _size, _name) {}
 
-    int AddOnMouseOverHandler(std::function< void() > handler)
+    int AddOnMouseOverHandler(std::function< void() > handler, bool ignoreLayer = false)
     {
-        onMouseOverHandlers.push_back(handler);
+        onMouseOverHandlers.push_back({handler, ignoreLayer});
         return onMouseOverHandlers.size() - 1;
     }
     
@@ -112,23 +135,49 @@ public:
         if (handler_index < 0 || handler_index >= onMouseOverHandlers.size())
             LogFatal("handler index out of bounds", "RemoveOnMouseOverHandler");
 
-        onMouseOverHandlers[handler_index] = NULL;
+        onMouseOverHandlers[handler_index] = {NULL, false};
     }
 
     
 
-    void Update() override
+    void Update(Time time) override
     {
+        if (BoxCollider::onMouseOverHandlersPoolTime < time.now)
+        {
+            for (auto p : BoxCollider::onMouseOverHandlersPool)
+                p.first();
+
+            BoxCollider::onMouseOverHandlersPool.clear();
+            BoxCollider::onMouseOverHandlersPoolTime = time.now;
+        }
         // LogInfo("Update call in BoxCollider");
         int x, y;
         SDL_GetMouseState(&x, &y);
 
         if((x >= position.x && x <= position.x + size.x) && (y >= position.y && y <= position.y + size.y))
-            for (auto f : onMouseOverHandlers)
-                f();
+            for (auto p : onMouseOverHandlers)
+            {
+                if (p.first == NULL) continue;
+                
+                if (p.second)
+                {
+                    p.first();
+                }
+                else
+                {
+                    if (!BoxCollider::onMouseOverHandlersPool.empty() && BoxCollider::onMouseOverHandlersPool[0].second > parentLayer) continue;
+                    if (!BoxCollider::onMouseOverHandlersPool.empty() && BoxCollider::onMouseOverHandlersPool[0].second < parentLayer)
+                        BoxCollider::onMouseOverHandlersPool.clear();
+
+                    BoxCollider::onMouseOverHandlersPool.push_back({p.first, parentLayer});
+                }
+            }
     }
 
 };
+double Force2D::BoxCollider::onMouseOverHandlersPoolTime;
+std::vector<std::pair<std::function<void()>, int>> Force2D::BoxCollider::onMouseOverHandlersPool;
+
 
 class GameObject
 {
@@ -136,6 +185,7 @@ public:
     Vector2 position;
     Vector2 size;
     Vector2 velocity;
+    int layer;
     bool selected;
 
 
@@ -148,7 +198,8 @@ public:
 
     void AddComponent(Component* component)
     {
-        component->SetParentPosition(position);
+        // component->SetParentPosition(position);
+        component->SetParentData(position, layer);
         components.push_back(component);
     }
     
@@ -176,11 +227,11 @@ public:
         return result;
     }
 
-    void Update()
+    void Update(Time time)
     {
         for(Component* c : components)
         {
-            c->Update();
+            c->Update(time);
         }
     }
 
@@ -220,6 +271,8 @@ private:
 class Scene
 {
 public:
+    Time time;
+
     GameObject* CreateGameObject(Vector2 position, Vector2 size)
     {
         gameObjects.push_back(new GameObject(position, size));
@@ -234,6 +287,8 @@ public:
         SDL_Event event;
         while (rendering)
         {
+            time.next(SDL_GetPerformanceCounter(), SDL_GetPerformanceFrequency());
+
             SDL_PollEvent(&event);
             if (event.type == SDL_QUIT)
             {
@@ -247,7 +302,7 @@ public:
             for(GameObject* obj : gameObjects)
             {
                 // LogInfo("OBJ");
-                obj->Update();
+                obj->Update(time);
                 SDL_Rect r = {.x = obj->position.x, .y = obj->position.y, .w = obj->size.x, .h = obj->size.y};
                 SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
                 SDL_RenderFillRect(renderer, &r);
