@@ -31,6 +31,7 @@ int main()
         return 1;
     }
 
+    /*
     Force2D::Scene* scene = new Force2D::Scene();
     //Force2D::GameObject* obj = scene->CreateGameObject({.x=10, .y=10}, {.x=100, .y=100});
     Force2D::GameObject* obj = new Force2D::GameObject({.x=10, .y=10}, {.x=100, .y=100});
@@ -89,7 +90,18 @@ int main()
 
 
     second_scene->StartRender(renderer);
+    */
 
+    using namespace Force2D;
+    auto scene = new Scene();
+    auto obj1 = new GameObject({10, 10}, {100, 100});
+    scene->AddGameObject(obj1);
+
+    auto obj2 = new GameObject({60, 60}, {100, 100});
+    obj2->SetTexture("./test_tex.png");
+    scene->AddGameObject(obj2);
+
+    scene->StartRender(renderer);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

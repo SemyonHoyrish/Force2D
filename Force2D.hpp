@@ -3,6 +3,7 @@
 
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 #include <functional> //std::function
 #include <string> //std::to_string
@@ -209,6 +210,8 @@ public:
     int layer;
     bool selected;
     Vector4 color;
+    std::string texture_filename;
+    SDL_Texture* texture = NULL;
 
 
     GameObject(Vector2 _position, Vector2 _size, int _layer = -1)
@@ -227,6 +230,10 @@ public:
         color    = {.x = 122, .y = 122, .z = 122, .w = 255};
     }
 
+    void SetTexture(std::string filename)
+    { 
+        texture_filename = filename;
+    }
 
     void AddComponent(Component* component)
     {
@@ -404,9 +411,21 @@ public:
             {
                 // LogInfo("OBJ");
                 obj->Update(time);
+
                 SDL_Rect r = {.x = obj->position.x, .y = obj->position.y, .w = obj->size.x, .h = obj->size.y};
-                SDL_SetRenderDrawColor(renderer, obj->color.x, obj->color.y, obj->color.z, obj->color.w);
-                SDL_RenderFillRect(renderer, &r);
+                if (obj->texture_filename == "")
+                {
+                    SDL_SetRenderDrawColor(renderer, obj->color.x, obj->color.y, obj->color.z, obj->color.w);
+                    SDL_RenderFillRect(renderer, &r);
+                }
+                else
+                {
+                    if (obj->texture == NULL)
+                    {
+                        obj->texture = IMG_LoadTexture(renderer, obj->texture_filename.c_str());
+                    }
+                    SDL_RenderCopy(renderer, obj->texture, NULL, &r);
+                }
 
                 if (debug)
                     for(Component* c : obj->GetComponents<BoxCollider>())
