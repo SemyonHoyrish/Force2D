@@ -24,6 +24,17 @@ struct Vector2
     }    
 };
 
+struct Vector4
+{
+    int x, y, z, w;
+
+    Vector4 operator+(Vector4 other)
+    {
+        return {.x = x + other.x, .y = y + other.y,
+                .z = z + other.z, .w = w + other.w};
+    }    
+};
+
 // struct GameObject
 // {
 //     int x, y;
@@ -75,10 +86,10 @@ class Component
 public:
     std::string name;
     Vector2 relativePosition;
-    // Vector2 parentPosition;
-    Vector2 position;
+    Vector2* parentPosition;
+    //Vector2 position;
     Vector2 size;
-    int parentLayer;
+    int* parentLayer;
     // const ComponentType type = ComponentType::BOX_COLLIDER;
 
     Component(Vector2 _relativePosition, Vector2 _size)
@@ -93,11 +104,20 @@ public:
         name     = _name;
     }
 
-    void SetParentData(Vector2 _parentPosition, int _parentLayer)
+    Vector2 GetPosition()
+    {
+        return (*parentPosition) + relativePosition;
+    }
+
+    int GetParentLayer()
+    {
+        return *parentLayer;
+    }
+
+    void SetParentData(Vector2* _parentPosition, int* _parentLayer)
     {
         parentPosition = _parentPosition;
         parentLayer    = _parentLayer;
-        position       = parentPosition + relativePosition;
     }
 
     virtual void Update(Time time)
@@ -105,21 +125,21 @@ public:
         LogError("Update call in Component");
     }
 
-private:
-    Vector2 parentPosition;
+//private:
+    //Vector2 parentPosition;
 
 };
 
 class BoxCollider : public Component
 {
 
-// private:
-public:
+private:
     std::vector<std::pair<std::function<void()>, bool>> onMouseOverHandlers;
     static double onMouseOverHandlersPoolTime;
-    static std::vector<std::pair<std::function<void()>, int>> onMouseOverHandlersPool;
+    static std::vector<std::pair<std::function<void()>, int*>> onMouseOverHandlersPool;
 
-// public:
+
+public:
 
     BoxCollider(Vector2 _position, Vector2 _size) : Component(_position, _size) {}
     BoxCollider(Vector2 _position, Vector2 _size, std::string _name) : Component(_position, _size, _name) {}
@@ -154,7 +174,7 @@ public:
         int x, y;
         SDL_GetMouseState(&x, &y);
 
-        if((x >= position.x && x <= position.x + size.x) && (y >= position.y && y <= position.y + size.y))
+        if((x >= GetPosition().x && x <= GetPosition().x + size.x) && (y >= GetPosition().y && y <= GetPosition().y + size.y))
             for (auto p : onMouseOverHandlers)
             {
                 if (p.first == NULL) continue;
@@ -165,8 +185,8 @@ public:
                 }
                 else
                 {
-                    if (!BoxCollider::onMouseOverHandlersPool.empty() && BoxCollider::onMouseOverHandlersPool[0].second > parentLayer) continue;
-                    if (!BoxCollider::onMouseOverHandlersPool.empty() && BoxCollider::onMouseOverHandlersPool[0].second < parentLayer)
+                    if (!BoxCollider::onMouseOverHandlersPool.empty() && *BoxCollider::onMouseOverHandlersPool[0].second > GetParentLayer()) continue;
+                    if (!BoxCollider::onMouseOverHandlersPool.empty() && *BoxCollider::onMouseOverHandlersPool[0].second < GetParentLayer())
                         BoxCollider::onMouseOverHandlersPool.clear();
 
                     BoxCollider::onMouseOverHandlersPool.push_back({p.first, parentLayer});
@@ -176,30 +196,42 @@ public:
 
 };
 double Force2D::BoxCollider::onMouseOverHandlersPoolTime;
-std::vector<std::pair<std::function<void()>, int>> Force2D::BoxCollider::onMouseOverHandlersPool;
+std::vector<std::pair<std::function<void()>, int*>> Force2D::BoxCollider::onMouseOverHandlersPool;
 
 
 class GameObject
 {
 public:
+    std::string name;
     Vector2 position;
     Vector2 size;
     Vector2 velocity;
     int layer;
     bool selected;
+    Vector4 color;
 
 
-    GameObject(Vector2 _position, Vector2 _size)
+    GameObject(Vector2 _position, Vector2 _size, int _layer = -1)
     {
         position = _position;
         size     = _size;
+        layer    = _layer;
+        color    = {.x = 122, .y = 122, .z = 122, .w = 255};
+    }
+    GameObject(Vector2 _position, Vector2 _size, std::string _name, int _layer = -1)
+    {
+        position = _position;
+        size     = _size;
+        name     = _name;
+        layer    = _layer;
+        color    = {.x = 122, .y = 122, .z = 122, .w = 255};
     }
 
 
     void AddComponent(Component* component)
     {
         // component->SetParentPosition(position);
-        component->SetParentData(position, layer);
+        component->SetParentData(&position, &layer);
         components.push_back(component);
     }
     
@@ -226,6 +258,38 @@ public:
         
         return result;
     }
+
+
+    void AddChild(GameObject* child)
+    {
+        childObjects.push_back(child);
+    }
+
+    GameObject* GetChild(std::string name)
+    {
+        for (GameObject* child : childObjects)
+            if (child->name == name) return child;
+    }
+
+    std::vector<GameObject*> GetChildren()
+    {
+        std::vector<GameObject*> res;
+        for (GameObject* child : childObjects)
+            res.push_back(child);
+        
+        return res;
+    }
+
+    std::vector<GameObject*> GetChildren(std::string name)
+    {
+        std::vector<GameObject*> res;
+        for (GameObject* child : childObjects)
+            if (child->name == name)
+                res.push_back(child);
+        
+        return res;
+    }
+    
 
     void Update(Time time)
     {
@@ -264,6 +328,7 @@ public:
 
 private:
     std::vector<Component*> components;
+    std::vector<GameObject*> childObjects;
 
 };
 
@@ -272,45 +337,81 @@ class Scene
 {
 public:
     Time time;
+    SDL_Event sdl_event;
 
-    GameObject* CreateGameObject(Vector2 position, Vector2 size)
+    /*GameObject* CreateGameObject(Vector2 position, Vector2 size)
     {
         gameObjects.push_back(new GameObject(position, size));
         return gameObjects[gameObjects.size() - 1];
+    }*/
+
+    void AddGameObject(GameObject* obj)
+    {
+        if (obj->layer == -1)
+            obj->layer = default_layer++;
+
+        gameObjects.push_back(obj);
+        //return gameObjects.size() - 1;
+    }
+
+    bool IsMouseDown()
+    {
+        return sdl_event.type == SDL_MOUSEBUTTONDOWN;
     }
 
     void StartRender(SDL_Renderer* _renderer)
     {
+        if (app_quit) return;
+
         rendering = true;
         renderer = _renderer;
 
-        SDL_Event event;
+        //SDL_Event event;
         while (rendering)
         {
             time.next(SDL_GetPerformanceCounter(), SDL_GetPerformanceFrequency());
 
-            SDL_PollEvent(&event);
-            if (event.type == SDL_QUIT)
+            //SDL_PollEvent(&event);
+            //if (event.type == SDL_QUIT)
+            SDL_PollEvent(&sdl_event);
+            if (sdl_event.type == SDL_QUIT)
             {
                 rendering = false;
+                app_quit = true;
                 return;
             }
 
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL_RenderClear(renderer);
 
-            for(GameObject* obj : gameObjects)
+            std::vector<GameObject*> objs_for_render;
+            for (GameObject* obj : gameObjects) {
+                objs_for_render.push_back(obj);
+                for (GameObject* o : ExportGameObjectChildren(obj))
+                    objs_for_render.push_back(o);
+            } 
+
+            //std::sort(gameObjects.begin(), gameObjects.end(), [](const GameObject* const a, const GameObject* const b) {
+            //            return a->layer < b->layer;
+            //        });
+
+            std::sort(objs_for_render.begin(), objs_for_render.end(), [](const GameObject* const a, const GameObject* const b) {
+                        return a->layer < b->layer;
+                    });
+
+            //for(GameObject* obj : gameObjects)
+            for(GameObject* obj : objs_for_render)
             {
                 // LogInfo("OBJ");
                 obj->Update(time);
                 SDL_Rect r = {.x = obj->position.x, .y = obj->position.y, .w = obj->size.x, .h = obj->size.y};
-                SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
+                SDL_SetRenderDrawColor(renderer, obj->color.x, obj->color.y, obj->color.z, obj->color.w);
                 SDL_RenderFillRect(renderer, &r);
 
                 if (debug)
                     for(Component* c : obj->GetComponents<BoxCollider>())
                     {
-                        SDL_Rect r = {.x = c->position.x, .y = c->position.y, .w = c->size.x, .h = c->size.y};
+                        SDL_Rect r = {.x = c->GetPosition().x, .y = c->GetPosition().y, .w = c->size.x, .h = c->size.y};
                         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
                         SDL_RenderDrawRect(renderer, &r);
                     }
@@ -341,8 +442,28 @@ private:
     std::vector<GameObject*> gameObjects;
     bool rendering;
     SDL_Renderer* renderer = NULL;
+    int default_layer = 0;
+
+    static bool app_quit;
+
+    std::vector<GameObject*> ExportGameObjectChildren(GameObject* obj, bool recursive = true)
+    {
+        std::vector<GameObject*> res;
+        
+        for (GameObject* child : obj->GetChildren())
+        {
+            res.push_back(child);
+            if (recursive)
+                for (GameObject* cc : ExportGameObjectChildren(child))
+                    res.push_back(cc);
+        }
+
+        return res;
+    }
 
 };
+bool Force2D::Scene::app_quit = false;
+
 
 }
 
