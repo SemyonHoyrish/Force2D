@@ -10,26 +10,6 @@ using namespace std;
 int main()
 {
     cout << "TEST" << endl;
-    
-    if (SDL_Init(SDL_INIT_VIDEO) != 0){
-        std::cout << "SDL_Init Error: " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    SDL_Window *window = SDL_CreateWindow("Test game", 100, 100, 640, 480, SDL_WINDOW_SHOWN);
-    if (window == nullptr){
-        std::cout << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (renderer == nullptr){
-        SDL_DestroyWindow(window);
-        std::cout << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return 1;
-    }
 
     /*
     Force2D::Scene* scene = new Force2D::Scene();
@@ -93,6 +73,9 @@ int main()
     */
 
     using namespace Force2D;
+
+    initSDL("GAME");
+
     auto scene = new Scene();
     auto obj1 = new GameObject({10, 10}, {100, 100});
     scene->AddGameObject(obj1);
@@ -101,11 +84,9 @@ int main()
     obj2->SetTexture("./test_tex.png");
     scene->AddGameObject(obj2);
 
-    scene->StartRender(renderer);
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    scene->StartRender();
+   
+    quitSDL();
 
     return 0;
 }

@@ -15,6 +15,58 @@ namespace Force2D
 
 bool debug = false;
 
+void LogInfo(std::string message)
+{
+    std::cout << "[INFO ] " + message << std::endl;
+}
+void LogError(std::string message)
+{
+    std::cout << "[ERROR] " + message << std::endl;
+}
+void LogError(std::string message, std::string subinfo)
+{
+    std::cout << "[ERROR] [" + subinfo + "]" + message << std::endl;
+}
+void LogFatal(std::string message)
+{
+    std::cout << "[FATAL] " + message << std::endl;
+    exit(1);
+}
+void LogFatal(std::string message, std::string subinfo)
+{
+    std::cout << "[FATAL] [" + subinfo + "]" + message << std::endl;
+    exit(1);
+}
+
+SDL_Window *mainWindow = NULL;
+SDL_Renderer *mainWindowRenderer = NULL;
+
+void initSDL(std::string mainWindowTitle, int mainWindowX = 100, int mainWindowY = 100, int mainWindowWidth = 640, int mainWindowHeight = 480)
+{
+    if (SDL_Init(SDL_INIT_VIDEO) != 0){
+        LogFatal((std::string)"SDL_Init Error: " + SDL_GetError());
+    }
+
+    mainWindow = SDL_CreateWindow(mainWindowTitle.c_str(), mainWindowX, mainWindowY, mainWindowWidth, mainWindowHeight, SDL_WINDOW_SHOWN);
+    if (mainWindow == nullptr){
+        LogFatal((std::string)"SDL_CreateWindow Error: " + SDL_GetError());
+        SDL_Quit();
+    }
+
+    mainWindowRenderer = SDL_CreateRenderer(mainWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (mainWindowRenderer == nullptr){
+        SDL_DestroyWindow(mainWindow);
+        LogFatal((std::string)"SDL_CreateRenderer Error: " + SDL_GetError());
+        SDL_Quit();
+    }
+}
+void quitSDL()
+{
+    SDL_DestroyRenderer(mainWindowRenderer);
+    SDL_DestroyWindow(mainWindow);
+    SDL_Quit();
+}
+
 struct Vector2
 {
     int x, y;
@@ -43,30 +95,6 @@ struct Vector4
 //     Vector2 velocity; 
 //     bool selected;
 // };
-
-void LogInfo(std::string message)
-{
-    std::cout << "[INFO ] " + message << std::endl;
-}
-void LogError(std::string message)
-{
-    std::cout << "[ERROR] " + message << std::endl;
-}
-void LogError(std::string message, std::string subinfo)
-{
-    std::cout << "[ERROR] [" + subinfo + "]" + message << std::endl;
-}
-void LogFatal(std::string message)
-{
-    std::cout << "[FATAL] " + message << std::endl;
-    exit(1);
-}
-void LogFatal(std::string message, std::string subinfo)
-{
-    std::cout << "[FATAL] [" + subinfo + "]" + message << std::endl;
-    exit(1);
-}
-
 
 struct Time
 {
@@ -366,12 +394,12 @@ public:
         return sdl_event.type == SDL_MOUSEBUTTONDOWN;
     }
 
-    void StartRender(SDL_Renderer* _renderer)
+    void StartRender(SDL_Renderer* _renderer = NULL)
     {
         if (app_quit) return;
 
         rendering = true;
-        renderer = _renderer;
+        renderer = (_renderer != NULL) ? _renderer : mainWindowRenderer;
 
         //SDL_Event event;
         while (rendering)
