@@ -77,12 +77,25 @@ int main()
     initSDL("GAME");
 
     auto scene = new Scene();
+
     auto obj1 = new GameObject({10, 10}, {100, 100});
     scene->AddGameObject(obj1);
 
     auto obj2 = new GameObject({60, 60}, {100, 100});
     obj2->SetTexture("./test_tex.png");
     scene->AddGameObject(obj2);
+  
+    //obj2->velocity = {.x = 5, .y = 3};
+
+    scene->Update = [obj2](Force2D::Time time) {
+        if (Force2D::KEY_PRESSED[SDLK_SPACE]) {
+            obj2->velocity = {.x = 5, .y = 3};
+        }
+        else
+        {
+            obj2->velocity = {.x = 0, .y = 0};
+        }
+    };
 
     scene->StartRender();
    

@@ -41,6 +41,9 @@ void LogFatal(std::string message, std::string subinfo)
 SDL_Window *mainWindow = NULL;
 SDL_Renderer *mainWindowRenderer = NULL;
 
+bool KEY_PRESSED[322];
+
+
 void initSDL(std::string mainWindowTitle, int mainWindowX = 100, int mainWindowY = 100, int mainWindowWidth = 640, int mainWindowHeight = 480)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0){
@@ -59,6 +62,11 @@ void initSDL(std::string mainWindowTitle, int mainWindowX = 100, int mainWindowY
         LogFatal((std::string)"SDL_CreateRenderer Error: " + SDL_GetError());
         SDL_Quit();
     }
+
+    for(int i = 0; i < 322; i++) {
+       KEY_PRESSED[i] = false;
+    }
+
 }
 void quitSDL()
 {
@@ -328,6 +336,9 @@ public:
 
     void Update(Time time)
     {
+        position.x += velocity.x;
+        position.y += velocity.y;
+
         for(Component* c : components)
         {
             c->Update(time);
@@ -374,6 +385,8 @@ public:
     Time time;
     SDL_Event sdl_event;
 
+    std::function<void(Time)> Update;
+
     /*GameObject* CreateGameObject(Vector2 position, Vector2 size)
     {
         gameObjects.push_back(new GameObject(position, size));
@@ -415,6 +428,20 @@ public:
                 app_quit = true;
                 return;
             }
+
+            if (sdl_event.type == SDL_KEYDOWN)
+            {
+                KEY_PRESSED[sdl_event.key.keysym.sym] = true;
+            }
+            else if (sdl_event.type == SDL_KEYUP)
+            {
+                KEY_PRESSED[sdl_event.key.keysym.sym] = false;
+            }
+    
+
+            if (Update != NULL)
+                Update(time);
+
 
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL_RenderClear(renderer);
